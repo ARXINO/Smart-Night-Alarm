@@ -1,13 +1,17 @@
 /*
     Author: Emre Şahin, Arda Peçel
-    Date: 31.01.2019
-    Version: v1.0
+    Date: 04.02.2019
+    Version: v1.1
 */
 ///////////////////////////////////
 const int relay_pin = 8;
+const int pir_threshold = 200;
+int pir_threshold_counter = pir_threshold;
 ///////////////////////////////////
 #include <SoftwareSerial.h>
-SoftwareSerial bluetooth(7, 8); // RX,TX
+SoftwareSerial bluetooth(7, 6); // RX,TX
+bool bt_state;
+bool lamp_state;
 ///////////////////////////////////
 int pir_val = 0;
 int pir_sensor = 2;
@@ -26,25 +30,37 @@ bool pir_fonc() {
 void relay(bool shutdown = false) {
   if (shutdown) {
     digitalWrite(relay_pin, LOW);
+  } else if (bt_state) {
+    if (lamp_state) {
+      digitalWrite(relay_pin, HIGH);
+    } else {
+      digitalWrite(relay_pin, LOW);
+    }
   } else if (pir_fonc()) {
+    pir_threshold_counter = 0;
     digitalWrite(relay_pin, HIGH);
   }
   else {
-    digitalWrite(relay_pin, LOW);
+    pir_threshold_counter += 1;
+    delay(50);
+    if (pir_threshold_counter >= pir_threshold) {
+      digitalWrite(relay_pin, LOW);
+      pir_threshold_counter = 0;
+    }
   }
 }
 
-char bt_funct() {
-  if (bluetooth.available())
-  {
+void bt_func() {
+  if (bluetooth.available()) {
     char data = bluetooth.read();
-    Serial.print("Gelen Veri: ");
-    Serial.println(data);
-
     if (data == '0') {
-      relay(true);
+      bt_state = true;
+      lamp_state = false;
     } else if (data == '1') {
-      relay(false);
+      bt_state = true;
+      lamp_state = true;
+    } else if (data == 'x') {
+      bt_state = false;
     }
   }
 }
@@ -58,6 +74,7 @@ void setup() {
 }
 
 void loop() {
+  bt_func();
   relay();
 }
 
